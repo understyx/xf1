@@ -42,7 +42,23 @@ Run-Test "Positive: DryRun with Winget (Default)" {
     }
 }
 
-# 3. Negative Test: Invalid InstallMethod
+# 3. Positive Test: Uninstall DryRun
+Run-Test "Positive: Uninstall DryRun" {
+    $output = pwsh ./Install-KomorebiTWM.ps1 -DryRun -Uninstall
+    if ($output -match "Eemaldamine:") {
+        Write-Host "Confirmed uninstall actions mentioned."
+    } else {
+        throw "Uninstall actions not found in output!"
+    }
+
+    if ($output -match "Konfiguratsiooni eemaldamine") {
+        Write-Host "Confirmed config removal mentioned."
+    } else {
+        throw "Config removal not found in output!"
+    }
+}
+
+# 4. Negative Test: Invalid InstallMethod
 Run-Test "Negative: Invalid InstallMethod" {
     try {
         # Using -ErrorAction Stop doesn't always catch parameter validation errors from outside
