@@ -24,37 +24,9 @@ param(
 
 $global:stepCounter = 1
 
-function Invoke-CommandSafe {
-    param(
-        [string]$Description,
-        [string]$Command,
-        [string]$Method,
-        [string]$ExtraInfo = "",
-        [string]$CheckCmd = ""
-    )
+function Check-AdminPrivileges {
+    if ($DryRun) { return }
 
-    if ($DryRun) {
-        Write-Host "  [$global:stepCounter] ${Description}: $Command       Meetod: $Method"
-        if ($ExtraInfo) {
-            Write-Host "       $ExtraInfo"
-        }
-        $global:stepCounter++
-    } else {
-        if ($CheckCmd -and (Get-Command $CheckCmd -ErrorAction SilentlyContinue)) {
-            Write-Host "[-] $CheckCmd on juba installeeritud, jäta vahele."
-        } else {
-            Write-Host "[+] Toiming: $Description ($Command)..."
-            try {
-                Invoke-Expression $Command
-            } catch {
-                Write-Error "Viga toimingu sooritamisel: $_"
-            }
-        }
-    }
-}
-
-# Admin check
-if (-not $DryRun) {
     if ($IsWindows) {
         $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
         if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -63,53 +35,103 @@ if (-not $DryRun) {
     }
 }
 
-# Check if InstallMethod is available
-if (-not $DryRun) {
-    if (-not (Get-Command $InstallMethod -ErrorAction SilentlyContinue)) {
-        Write-Error "VIGA: Paigaldusmeetod '$InstallMethod' ei ole kättesaadav. Palun installi see kõigepealt."
+function Check-InstallMethodAvailable {
+    param([string]$Method)
+    if ($DryRun) { return }
+
+    if (-not (Get-Command $Method -ErrorAction SilentlyContinue)) {
+        Write-Error "VIGA: Paigaldusmeetod '$Method' ei ole kättesaadav. Palun installi see kõigepealt."
         exit 1
     }
 }
 
-if ($DryRun) {
-    Write-Host "[DRY-RUN] Järgmised toimingud TEHTAKS (midagi pole muudetud):"
-    Write-Host ""
+function Install-Komorebi {
+    param([string]$Method)
+    $pkg = if ($Method -eq "winget") { "LGUG2Z.komorebi" } else { "komorebi" }
+    $cmd = "$Method install $pkg"
+
+    if ($DryRun) {
+        Write-Host "  [$global:stepCounter] Installimine: $cmd       Meetod: $Method"
+        $global:stepCounter++
+    } else {
+        if (Get-Command "komorebic" -ErrorAction SilentlyContinue) {
+            Write-Host "[-] komorebi on juba installeeritud, jäta vahele."
+        } else {
+            Write-Host "[+] Toiming: Installimine ($cmd)..."
+            Invoke-Expression $cmd
+        }
+    }
 }
 
-# 1. Install Komorebi
-$komorebiPkg = if ($InstallMethod -eq "winget") { "LGUG2Z.komorebi" } else { "komorebi" }
-$komorebiInstallCmd = "$InstallMethod install $komorebiPkg"
-Invoke-CommandSafe -Description "Installimine" -Command $komorebiInstallCmd -Method $InstallMethod -CheckCmd "komorebic"
+function Install-Whkd {
+    param([string]$Method)
+    $pkg = if ($Method -eq "winget") { "LGUG2Z.whkd" } else { "whkd" }
+    $cmd = "$Method install $pkg"
 
-# 2. Install whkd
-$whkdPkg = if ($InstallMethod -eq "winget") { "LGUG2Z.whkd" } else { "whkd" }
-$whkdInstallCmd = "$InstallMethod install $whkdPkg"
-Invoke-CommandSafe -Description "Installimine" -Command $whkdInstallCmd -Method $InstallMethod -CheckCmd "whkd"
+    if ($DryRun) {
+        Write-Host "  [$global:stepCounter] Installimine: $cmd       Meetod: $Method"
+        $global:stepCounter++
+    } else {
+        if (Get-Command "whkd" -ErrorAction SilentlyContinue) {
+            Write-Host "[-] whkd on juba installeeritud, jäta vahele."
+        } else {
+            Write-Host "[+] Toiming: Installimine ($cmd)..."
+            Invoke-Expression $cmd
+        }
+    }
+}
 
-# 3. Create Komorebi config
-$configFiles = "$HOME\komorebi.json, $HOME\applications.json"
-Invoke-CommandSafe -Description "Konfiguratsiooni loomine" -Command "komorebic quickstart" -Method "komorebic" -ExtraInfo "Loob failid: $configFiles"
+function Initialize-KomorebiConfig {
+    $configFiles = "$HOME\komorebi.json, $HOME\applications.json"
+    $cmd = "komorebic quickstart"
 
-# 4. Keybind configuration (whkdrc)
-$whkdrcContent = @"
+    if ($DryRun) {
+        Write-Host "  [$global:stepCounter] Konfiguratsiooni loomine: $cmd       Meetod: komorebic"
+        Write-Host "       Loob failid: $configFiles"
+        $global:stepCounter++
+    } else {
+        Write-Host "[+] Toiming: Konfiguratsiooni loomine ($cmd)..."
+        Invoke-Expression $cmd
+    }
+}
+
+function Set-KeybindConfiguration {
+    param([string]$Path)
+    $content = @"
 alt + h  : komorebic focus left
 alt + l  : komorebic focus right
 alt + k  : komorebic focus up
 alt + j  : komorebic focus down
 "@
 
-if ($DryRun) {
-    Write-Host "  [$global:stepCounter] Keybindi konfiguratsioon kirjutataks faili: $ConfigPath"
-    Write-Host "       Sisu (esimesed read):"
-    $whkdrcContent.Split("`n") | Select-Object -First 4 | ForEach-Object { Write-Host "         $_" }
-} else {
-    Write-Host "[+] Kirjutan keybindid faili: $ConfigPath"
-    $configDir = Split-Path $ConfigPath
-    if ($configDir -and -not (Test-Path $configDir)) {
-        New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+    if ($DryRun) {
+        Write-Host "  [$global:stepCounter] Keybindi konfiguratsioon kirjutataks faili: $Path"
+        Write-Host "       Sisu (esimesed read):"
+        $content.Split("`n") | Select-Object -First 4 | ForEach-Object { Write-Host "         $_" }
+        $global:stepCounter++
+    } else {
+        Write-Host "[+] Kirjutan keybindid faili: $Path"
+        $dir = Split-Path $Path
+        if ($dir -and -not (Test-Path $dir)) {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        }
+        $content | Out-File -FilePath $Path -Encoding utf8
     }
-    $whkdrcContent | Out-File -FilePath $ConfigPath -Encoding utf8
 }
+
+# Execution
+Check-AdminPrivileges
+Check-InstallMethodAvailable -Method $InstallMethod
+
+if ($DryRun) {
+    Write-Host "[DRY-RUN] Järgmised toimingud TEHTAKS (midagi pole muudetud):"
+    Write-Host ""
+}
+
+Install-Komorebi -Method $InstallMethod
+Install-Whkd -Method $InstallMethod
+Initialize-KomorebiConfig
+Set-KeybindConfiguration -Path $ConfigPath
 
 if ($DryRun) {
     Write-Host ""
