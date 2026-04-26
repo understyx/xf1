@@ -40,13 +40,50 @@ function Check-AdminPrivileges {
     }
 }
 
+function Install-Winget {
+    if ($DryRun) {
+        Write-Host "  [$global:stepCounter] Meetodi paigaldamine: winget       Meetod: PowerShell"
+        $global:stepCounter++
+    } else {
+        Write-Host "[+] Paigaldan winget-it..."
+        Invoke-WebRequest https://raw.githubusercontent.com/asheroto/winget-installer/master/winget-install.ps1 -UseBasicParsing | iex
+    }
+}
+
+function Install-Scoop {
+    if ($DryRun) {
+        Write-Host "  [$global:stepCounter] Meetodi paigaldamine: scoop       Meetod: PowerShell"
+        $global:stepCounter++
+    } else {
+        Write-Host "[+] Paigaldan scoop-it..."
+        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+        Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+    }
+}
+
 function Check-InstallMethodAvailable {
     param([string]$Method)
-    if ($DryRun) { return }
 
     if (-not (Get-Command $Method -ErrorAction SilentlyContinue)) {
-        Write-Error "VIGA: Paigaldusmeetod '$Method' ei ole kättesaadav. Palun installi see kõigepealt."
-        exit 1
+        if ($DryRun) {
+            Write-Host "  [$global:stepCounter] Meetod '$Method' puudub, küsitaks paigaldamist."
+            $global:stepCounter++
+            return
+        }
+
+        Write-Host "VIGA: Paigaldusmeetod '$Method' ei ole kättesaadav." -ForegroundColor Yellow
+        $choice = Read-Host "Kas soovid, et skript paigaldaks '$Method' automaatselt? (J/E)"
+        if ($choice -eq 'J' -or $choice -eq 'j') {
+            if ($Method -eq "winget") { Install-Winget } else { Install-Scoop }
+
+            # Refresh path for current session if possible, though some tools require restart
+            if (-not (Get-Command $Method -ErrorAction SilentlyContinue)) {
+                Write-Warning "Paigaldus lõpetatud, kuid '$Method' pole veel PATH-is. Võib olla vajalik skripti uuesti käivitamine uues aknas."
+            }
+        } else {
+            Write-Error "VIGA: Paigaldusmeetod '$Method' on vajalik jätkamiseks."
+            exit 1
+        }
     }
 }
 
@@ -194,12 +231,13 @@ function Remove-KeybindConfiguration {
 
 # Execution logic
 Check-AdminPrivileges
-Check-InstallMethodAvailable -Method $InstallMethod
 
 if ($DryRun) {
     Write-Host "[DRY-RUN] Järgmised toimingud TEHTAKS (midagi pole muudetud):"
     Write-Host ""
 }
+
+Check-InstallMethodAvailable -Method $InstallMethod
 
 if ($Uninstall) {
     Uninstall-Komorebi -Method $InstallMethod
