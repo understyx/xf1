@@ -1,0 +1,15 @@
+RepoCommit: 37ea802d789647475e47d4d5cdf5dc76df2a51bb
+Version: 0.1
+AI_assistance: jah
+AI_model: gemini 3.1 pro
+Created: 2026-04-26
+HowToRun:
+1. Ava PowerShell administraatorina.
+2. Käivita installi skript (vaikimisi winget meetod):
+   .\Install-KomorebiTWM.ps1
+3. Alternatiivselt kasuta Scoop-i:
+   .\Install-KomorebiTWM.ps1 -InstallMethod scoop
+4. Vaata, mida skript teeks ilma muudatusi tegemata:
+   .\Install-KomorebiTWM.ps1 -DryRun
+5. Eemalda komponendid:
+   .\Install-KomorebiTWM.ps1 -Uninstall
