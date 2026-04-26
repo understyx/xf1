@@ -39,6 +39,13 @@ Eemalda kõik paigaldatud komponendid ja seaded:
 .\Install-KomorebiTWM.ps1 -Uninstall
 ```
 
+### Testimine
+
+Projekt kasutab Pester raamistikku testimiseks. Testide käivitamiseks:
+```powershell
+Invoke-Pester ./Install-KomorebiTWM.Tests.ps1
+```
+
 ## Klahvikombinatsioonid
 
 Skript seadistab järgmised vaikimisi klahvikombinatsioonid:

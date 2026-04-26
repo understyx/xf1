@@ -13,3 +13,5 @@ HowToRun:
    .\Install-KomorebiTWM.ps1 -DryRun
 5. Eemalda komponendid:
    .\Install-KomorebiTWM.ps1 -Uninstall
+6. Käivita testid (vajab Pester moodulit):
+   Invoke-Pester ./Install-KomorebiTWM.Tests.ps1
