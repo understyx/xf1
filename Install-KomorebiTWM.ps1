@@ -40,6 +40,17 @@ function Check-AdminPrivileges {
     }
 }
 
+function Refresh-Environment {
+    if ($DryRun) {
+        Write-Host "  [$global:stepCounter] Keskkonnamuutujate värskendamine (PATH uuesti laadimine)       Meetod: PowerShell"
+        $global:stepCounter++
+        return
+    }
+
+    Write-Host "[+] Värskendan keskkonnamuutujaid (PATH)..."
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+}
+
 function Install-Winget {
     if ($DryRun) {
         Write-Host "  [$global:stepCounter] Meetodi paigaldamine: winget       Meetod: PowerShell"
@@ -47,6 +58,7 @@ function Install-Winget {
     } else {
         Write-Host "[+] Paigaldan winget-it..."
         Invoke-WebRequest https://raw.githubusercontent.com/asheroto/winget-installer/master/winget-install.ps1 -UseBasicParsing | iex
+        Refresh-Environment
     }
 }
 
@@ -58,6 +70,7 @@ function Install-Scoop {
         Write-Host "[+] Paigaldan scoop-it..."
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
         Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+        Refresh-Environment
     }
 }
 
@@ -76,9 +89,8 @@ function Check-InstallMethodAvailable {
         if ($choice -eq 'J' -or $choice -eq 'j') {
             if ($Method -eq "winget") { Install-Winget } else { Install-Scoop }
 
-            # Refresh path for current session if possible, though some tools require restart
             if (-not (Get-Command $Method -ErrorAction SilentlyContinue)) {
-                Write-Warning "Paigaldus lõpetatud, kuid '$Method' pole veel PATH-is. Võib olla vajalik skripti uuesti käivitamine uues aknas."
+                Write-Warning "Paigaldus lõpetatud, kuid '$Method' pole veel PATH-is pärast värskendamist."
             }
         } else {
             Write-Error "VIGA: Paigaldusmeetod '$Method' on vajalik jätkamiseks."
@@ -101,6 +113,7 @@ function Install-Komorebi {
         } else {
             Write-Host "[+] Toiming: Installimine ($cmd)..."
             Invoke-Expression $cmd
+            Refresh-Environment
         }
     }
 }
@@ -137,6 +150,7 @@ function Install-Whkd {
         } else {
             Write-Host "[+] Toiming: Installimine ($cmd)..."
             Invoke-Expression $cmd
+            Refresh-Environment
         }
     }
 }
@@ -169,6 +183,9 @@ function Initialize-KomorebiConfig {
         $global:stepCounter++
     } else {
         Write-Host "[+] Toiming: Konfiguratsiooni loomine ($cmd)..."
+        if (-not (Get-Command "komorebic" -ErrorAction SilentlyContinue)) {
+            Refresh-Environment
+        }
         Invoke-Expression $cmd
     }
 }
